@@ -5,6 +5,7 @@ use arrow_schema::{DataType, Field, TimeUnit};
 use bytes::{BufMut, BytesMut};
 use enum_dispatch::enum_dispatch;
 use std::{any::type_name, convert::identity, sync::Arc};
+use uuid;
 
 use crate::error::ErrorKind;
 use crate::pg_schema::{Column, PostgresType, TypeSize};
@@ -481,50 +482,11 @@ type LargeBinaryEncoder<'a> = GenericBinaryEncoder<'a, i64>;
 
 // UUID parsing functions
 fn parse_uuid_string(uuid_str: &str, field: &str) -> Result<[u8; 16], ErrorKind> {
-    let hex_str = match uuid_str.len() {
-        36 => {
-            // Format: 08b2a930-4800-afff-0200-525602e30465
-            // Check dash positions using direct byte indexing
-            let bytes = uuid_str.as_bytes();
-            if bytes[8] != b'-' || bytes[13] != b'-' || bytes[18] != b'-' || bytes[23] != b'-' {
-                return Err(ErrorKind::Encode {
-                    reason: format!(
-                        "Invalid UUID format in field '{field}': expected dashes at positions 8, 13, 18, 23"
-                    ),
-                });
-            }
-
-            // Remove dashes by creating a string without them
-            let mut hex_chars = String::with_capacity(32);
-            for (i, &byte) in bytes.iter().enumerate() {
-                if i != 8 && i != 13 && i != 18 && i != 23 {
-                    hex_chars.push(byte as char);
-                }
-            }
-            hex_chars
-        }
-        32 => {
-            // Format: 08b2a9304800afff0200525602e30465
-            uuid_str.to_string()
-        }
-        _ => {
-            return Err(ErrorKind::Encode {
-                reason: format!(
-                    "Invalid UUID format in field '{}': expected 32 or 36 characters, got {}",
-                    field,
-                    uuid_str.len()
-                ),
-            });
-        }
-    };
-
-    // Use the optimized hex crate
-    let mut result = [0u8; 16];
-    hex::decode_to_slice(&hex_str, &mut result).map_err(|_| ErrorKind::Encode {
-        reason: format!("Invalid UUID format in field '{field}': invalid hex characters"),
-    })?;
-
-    Ok(result)
+    uuid::Uuid::parse_str(uuid_str)
+        .map(|uuid| *uuid.as_bytes())
+        .map_err(|_| ErrorKind::Encode {
+            reason: format!("Invalid UUID format in field '{field}': {uuid_str}"),
+        })
 }
 
 #[derive(Debug)]

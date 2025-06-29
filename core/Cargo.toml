@@ -18,6 +18,7 @@ enum_dispatch = "0.3.11"
 anyhow = "1.0.70"
 thiserror = "1.0.40"
 hex = "0.4"
+uuid = "1.0"
 
 [dependencies.arrow-array]
 version = ">=46.0.0"
